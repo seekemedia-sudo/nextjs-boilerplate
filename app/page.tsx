@@ -1,103 +1,122 @@
-import Image from "next/image";
+import JSZip from 'jszip';
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+export const dynamic = 'force-dynamic';
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+type Vehicle = {
+	id: string;
+	year: number;
+	make: string;
+	model: string;
+	trim?: string | null;
+	condition: 'new' | 'used' | 'certified';
+	finalUrl: string;
+	city?: string | null;
+};
+
+function clampHeadline(s: string) { return s.length <= 30 ? s : s.slice(0, 30); }
+function clampDesc(s: string) { return s.length <= 90 ? s : s.slice(0, 90); }
+
+function csvEscape(value: string | number): string {
+	const s = String(value ?? '');
+	if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+		return `"${s.replace(/"/g, '""')}"`;
+	}
+	return s;
+}
+
+function toCsv(headers: string[], rows: Array<Array<string | number>>): string {
+	const head = headers.map(csvEscape).join(',');
+	const body = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+	return [head, body].filter(Boolean).join('\n');
+}
+
+// Very simple generator for keywords and ads (Search only)
+function buildForVehicles(campaignName: string, vehicles: Vehicle[]) {
+	// Campaigns
+	const campaignsHeaders = ['Campaign','Campaign Type','Status','Daily Budget','Bidding Strategy','Networks','Locations','Languages','Start Date','End Date'];
+	const campaignsRows = [
+		[campaignName,'Search','Enabled','0.01','Manual CPC','Google Search;Search Partners','United States','English','','']
+	];
+
+	// Ad groups
+	const adGroupsHeaders = ['Campaign','Ad Group','Status','Default Max. CPC'];
+	const adGroupsRows: any[] = [];
+
+	// Keywords
+	const kwHeaders = ['Campaign','Ad Group','Criterion Type','Keyword','Final URL','Max CPC'];
+	const kwRows: any[] = [];
+
+	// RSAs (minimal columns)
+	const adsHeaders = ['Campaign','Ad Group','Final URL','Path 1','Path 2','Headline 1','Headline 2','Headline 3','Description 1','Description 2'];
+	const adsRows: any[] = [];
+
+	for (const v of vehicles) {
+		const ag = `${v.year} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ''} | ${v.id}`;
+		adGroupsRows.push([campaignName, ag, 'Enabled', '0.01']);
+
+		const core = `${v.year} ${v.make} ${v.model}${v.trim ? ` ${v.trim}` : ''}`.toLowerCase();
+
+		kwRows.push([campaignName, ag, 'Exact', `[${core}]`, v.finalUrl, '0.01']);
+		kwRows.push([campaignName, ag, 'Phrase', `"${v.make.toLowerCase()} ${v.model.toLowerCase()}"`, v.finalUrl, '0.01']);
+
+		const h1 = clampHeadline(`${v.year} ${v.make} ${v.model}`);
+		const h2 = clampHeadline(`${v.condition === 'used' ? 'Used ' : ''}${v.model} in Stock`);
+		const h3 = clampHeadline('Test Drive Today');
+		const d1 = clampDesc(`${v.year} ${v.make} ${v.model}${v.trim ? ' ' + v.trim : ''}. In stock. Transparent pricing.`);
+		const d2 = clampDesc('Get pre-approved online. Visit our site for photos & price.');
+
+		const path1 = v.model.toLowerCase().replace(/\s+/g, '-');
+		const path2 = v.trim ? v.trim.toLowerCase().replace(/\s+/g, '-') : 'details';
+
+		adsRows.push([campaignName, ag, v.finalUrl, path1, path2, h1, h2, h3, d1, d2]);
+	}
+
+	return {
+		campaignsCsv: toCsv(campaignsHeaders, campaignsRows),
+		adGroupsCsv: toCsv(adGroupsHeaders, adGroupsRows),
+		keywordsCsv: toCsv(kwHeaders, kwRows),
+		adsCsv: toCsv(adsHeaders, adsRows)
+	};
+}
+
+// TEMP: Demo inventory for AutoNation Toyota Fort Myers (Used only)
+function demoVehiclesFor(url: string): Vehicle[] {
+	// In MVP we stub a couple vehicles so you can test the CSV in Editor immediately.
+	// Daily sync and real scraping will replace this.
+	if (url.includes('autonationtoyotafortmyers.com')) {
+		return [
+			{ id: 'VIN123456', year: 2021, make: 'Toyota', model: 'Camry', trim: 'SE', condition: 'used', finalUrl: 'https://www.autonationtoyotafortmyers.com/used/Toyota/2021-Toyota-Camry-VIN123456.htm', city: 'Fort Myers' },
+			{ id: 'VIN987654', year: 2020, make: 'Toyota', model: 'RAV4', trim: 'XLE', condition: 'used', finalUrl: 'https://www.autonationtoyotafortmyers.com/used/Toyota/2020-Toyota-RAV4-VIN987654.htm', city: 'Fort Myers' }
+		];
+	}
+	// Generic sample
+	return [
+		{ id: 'VIN000001', year: 2019, make: 'Honda', model: 'Civic', trim: 'EX', condition: 'used', finalUrl: url, city: null }
+	];
+}
+
+export async function POST(request: Request) {
+	const { dealershipUrl } = await request.json();
+	const url: string = typeof dealershipUrl === 'string' && dealershipUrl ? dealershipUrl : '';
+
+	const vehicles = demoVehiclesFor(url);
+	const campaignName = 'Dealer Search – Staging';
+
+	const { campaignsCsv, adGroupsCsv, keywordsCsv, adsCsv } = buildForVehicles(campaignName, vehicles);
+
+	const zip = new JSZip();
+	zip.file('Campaigns.csv', campaignsCsv);
+	zip.file('AdGroups.csv', adGroupsCsv);
+	zip.file('Keywords.csv', keywordsCsv);
+	zip.file('Ads_RSA.csv', adsCsv);
+
+	const content = await zip.generateAsync({ type: 'nodebuffer' });
+
+	return new Response(content, {
+		status: 200,
+		headers: {
+			'Content-Type': 'application/zip',
+			'Content-Disposition': 'attachment; filename="google-ads-search.zip"'
+		}
+	});
 }
